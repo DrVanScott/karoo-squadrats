@@ -1,7 +1,14 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
+}
+
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 android {
@@ -14,6 +21,16 @@ android {
         targetSdk = 36
         versionCode = providers.environmentVariable("VERSION_CODE").map { it.toInt() }.getOrElse(1)
         versionName = providers.environmentVariable("VERSION_NAME").getOrElse("dev")
+
+        // Empty by default (see debug/local build types below) so a release build never picks
+        // up a token from a developer's local.properties.
+        buildConfigField("String", "DEFAULT_USER_TOKEN", "\"\"")
+
+        // Karoo identifies extensions by this id (see res/xml/extension_info.xml), not by
+        // Android package name. Non-release variants need their own id (must match the
+        // per-variant extension_info.xml override) or Karoo routes map callbacks to
+        // whichever app registered "karoo-squadrats" first, ignoring the others entirely.
+        buildConfigField("String", "EXTENSION_ID", "\"karoo-squadrats\"")
     }
 
     signingConfigs {
@@ -28,10 +45,27 @@ android {
         }
     }
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            buildConfigField("String", "EXTENSION_ID", "\"karoo-squadrats-debug\"")
+            // Dev convenience: pre-fill the Squadrats token on a fresh install so it doesn't
+            // need to be re-typed after every reinstall. Set `squadrats.token` in the
+            // gitignored local.properties; leave unset to keep this empty as usual.
+            buildConfigField("String", "DEFAULT_USER_TOKEN", "\"${localProps.getProperty("squadrats.token", "")}\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
             signingConfig = signingConfigs.findByName("release")
+        }
+        // Non-debug build, signed with the local debug keystore, installable
+        // side-by-side with the official release build for manual testing.
+        create("local") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".local"
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("String", "EXTENSION_ID", "\"karoo-squadrats-local\"")
+            buildConfigField("String", "DEFAULT_USER_TOKEN", "\"${localProps.getProperty("squadrats.token", "")}\"")
         }
     }
     compileOptions {

@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
+import sr.leo.karoo_squadrats.BuildConfig
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "squadrats_settings")
 
@@ -17,7 +18,7 @@ class Settings(context: Context) {
     private val dataStore = context.dataStore
 
     suspend fun getUserToken(): String =
-        dataStore.data.first()[USER_TOKEN] ?: ""
+        dataStore.data.first()[USER_TOKEN] ?: BuildConfig.DEFAULT_USER_TOKEN
 
     suspend fun setUserToken(value: String) {
         dataStore.edit { it[USER_TOKEN] = value }
@@ -51,6 +52,13 @@ class Settings(context: Context) {
         dataStore.edit { it[SQUADRATINHOS_ENABLED] = value }
     }
 
+    suspend fun getLiveCollectionEnabled(): Boolean =
+        dataStore.data.first()[LIVE_COLLECTION_ENABLED] ?: true
+
+    suspend fun setLiveCollectionEnabled(value: Boolean) {
+        dataStore.edit { it[LIVE_COLLECTION_ENABLED] = value }
+    }
+
     suspend fun getTileUrlTemplate(timestamp: String): String {
         val token = dataStore.data.first()[USER_TOKEN] ?: ""
         if (token.isEmpty() || timestamp.isEmpty()) return ""
@@ -69,5 +77,6 @@ class Settings(context: Context) {
         private val CENTER_LON = doublePreferencesKey("center_lon")
         private val SYNC_RADIUS = intPreferencesKey("sync_radius_km")
         private val SQUADRATINHOS_ENABLED = booleanPreferencesKey("squadratinhos_enabled")
+        private val LIVE_COLLECTION_ENABLED = booleanPreferencesKey("live_collection_enabled")
     }
 }

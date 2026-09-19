@@ -47,6 +47,23 @@ class TileRepository(
 
     suspend fun squadratCount(): Int = squadratDao.count()
 
+    /**
+     * Persist tiles entered live during a ride as collected, so they render as normal
+     * cached tiles from now on.
+     */
+    suspend fun markSquadratsCollected(keys: Set<Long>) {
+        if (keys.isEmpty()) return
+        val now = System.currentTimeMillis()
+        squadratDao.insertAll(keys.map { TileCoord.fromKey(it).let { t -> CollectedSquadrat(t.x, t.y, now) } })
+    }
+
+    /** @see markSquadratsCollected */
+    suspend fun markSquadratinhosCollected(keys: Set<Long>) {
+        if (keys.isEmpty()) return
+        val now = System.currentTimeMillis()
+        squadratinhoDao.insertAll(keys.map { TileCoord.fromKey(it).let { t -> CollectedSquadratinho(t.x, t.y, now) } })
+    }
+
     sealed class TimestampResult {
         data class Success(val timestamp: String) : TimestampResult()
         data class Error(val syncError: SyncError) : TimestampResult()
