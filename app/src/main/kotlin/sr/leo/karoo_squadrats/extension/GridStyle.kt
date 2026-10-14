@@ -20,7 +20,7 @@ enum class GridStyle(
         override fun gridWidth(baseWidth: Int) = (baseWidth - 1).coerceAtLeast(1)
     },
 
-    /** Tiles entered during the current ride but not yet confirmed collected via sync. */
+    /** Tiles entered live but not yet confirmed collected via sync. */
     ENTERED(
         contourColor = 0xFF2ECC71.toInt(),
         gridColor = 0x662ECC71,

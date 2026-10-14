@@ -66,39 +66,26 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
     }
 
     /**
-     * Once a ride finishes (transitions from Recording/Paused back to Idle), drop the
-     * in-memory "freshly entered" flag so those tiles render as normal cached tiles from
-     * then on. The underlying collected-tile data was already persisted as each tile was
-     * entered (see [trackEnteredTiles]) - there's nothing left to save here.
+     * Tracks whether a ride is actively recording (see [isRideActive]) - live collection only
+     * runs then, since there's no FIT file as proof otherwise.
      */
     private suspend fun observeRideCompletion() {
-        var wasRiding = false
         karooSystem.consumerFlow<RideState>().collect { state ->
-            when (state) {
-                is RideState.Recording, is RideState.Paused -> {
-                    wasRiding = true
-                    isRideActive = true
-                }
-                is RideState.Idle -> {
-                    isRideActive = false
-                    if (wasRiding) {
-                        wasRiding = false
-                        recentlyEnteredSquadrats.clear()
-                        recentlyEnteredSquadratinhos.clear()
-                    }
-                }
+            isRideActive = when (state) {
+                is RideState.Recording, is RideState.Paused -> true
+                is RideState.Idle -> false
             }
         }
     }
 
     /**
-     * Record and immediately persist the tile(s) between the previous and current position as
-     * collected, if not already cached (see [tilesToMark]). Called on every location update,
-     * independent of the redraw throttle in [startMap], so a quick tile crossing between two
-     * redraws is never missed.
+     * Record the tile(s) between the previous and current position as entered, if not already
+     * cached as collected (see [tilesToMark]). Called on every location update, independent of
+     * the redraw throttle in [startMap], so a quick tile crossing between two redraws is never
+     * missed.
      *
-     * Persisting immediately (rather than waiting for the ride to end) means a crash mid-ride
-     * only loses the "freshly entered" (green) styling, never the collected-tile data itself.
+     * Tracked only in memory (see [recentlyEnteredSquadrats]) - never written to the durable
+     * cache, since a ride may never actually be uploaded to or processed by Squadrats.
      *
      * @return true if a tile was newly recorded as entered (wasn't already tracked).
      */
@@ -114,7 +101,6 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
             if (tileRepo.collectedSquadratsInBounds(sq.x, sq.x, sq.y, sq.y).isEmpty()) {
                 if (recentlyEnteredSquadrats.add(sq.toKey())) {
                     changed = true
-                    tileRepo.markSquadratsCollected(setOf(sq.toKey()))
                 }
             }
         }
@@ -123,7 +109,6 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
                 if (tileRepo.collectedSquadratinhosInBounds(sh.x, sh.x, sh.y, sh.y).isEmpty()) {
                     if (recentlyEnteredSquadratinhos.add(sh.toKey())) {
                         changed = true
-                        tileRepo.markSquadratinhosCollected(setOf(sh.toKey()))
                     }
                 }
             }
@@ -290,10 +275,9 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
     companion object {
         private const val TAG = "SquadratMap"
 
-        // Tiles entered live during the current ride, already persisted as collected (see
-        // trackEnteredTiles) - this set only tracks which ones are still "fresh" and should
-        // render with the entered/green style, until the ride ends (see observeRideCompletion).
-        // Held here (not as instance fields) so MainActivity's "Clear Cache" can reset them too.
+        // Tiles entered live during a ride, tracked only in memory (see trackEnteredTiles) -
+        // never written to the durable cache, since a ride may never actually be uploaded to or
+        // processed by Squadrats.
         private val recentlyEnteredSquadrats = Collections.newSetFromMap(ConcurrentHashMap<Long, Boolean>())
         private val recentlyEnteredSquadratinhos = Collections.newSetFromMap(ConcurrentHashMap<Long, Boolean>())
 

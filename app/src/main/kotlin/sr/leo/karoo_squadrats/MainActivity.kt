@@ -273,6 +273,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     override fun onComplete(collected: Int, total: Int) {
+                        SquadratsExtension.clearRecentlyEntered()
                         runOnUiThread {
                             progressSync.visibility = View.GONE
                             txtSyncStatus.visibility = View.GONE
