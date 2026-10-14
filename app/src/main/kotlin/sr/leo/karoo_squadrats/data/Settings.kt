@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
-import sr.leo.karoo_squadrats.BuildConfig
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "squadrats_settings")
 
@@ -18,7 +17,7 @@ class Settings(context: Context) {
     private val dataStore = context.dataStore
 
     suspend fun getUserToken(): String =
-        dataStore.data.first()[USER_TOKEN] ?: BuildConfig.DEFAULT_USER_TOKEN
+        dataStore.data.first()[USER_TOKEN] ?: ""
 
     suspend fun setUserToken(value: String) {
         dataStore.edit { it[USER_TOKEN] = value }

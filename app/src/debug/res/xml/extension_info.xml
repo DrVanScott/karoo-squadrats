@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<ExtensionInfo
-    displayName="Squadrats Overlay (Debug)"
-    icon="@drawable/ic_squadrats"
-    id="karoo-squadrats-debug"
-    scansDevices="false"
-    mapLayer="true" />
