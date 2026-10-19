@@ -227,7 +227,11 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
                         sqTiles.minOf { it.y }, sqTiles.maxOf { it.y },
                     )
                     val sqEntered = if (showEnteredTiles) recentlyEnteredSquadrats.intersect(sqTileKeys) else emptySet<Long>()
-                    val sqUncollected = sqTileKeys - sqCollected - sqEntered
+                    // Cache-only, deliberately not excluding sqEntered: the solid/light boundary
+                    // distinction ContourExtractor draws should reflect confirmed cache state,
+                    // not a transient live-tracked tile - entered tiles stay part of the
+                    // surrounding uncollected grid underneath their green inset overlay.
+                    val sqUncollected = sqTileKeys - sqCollected
                     val sqGrid = ContourExtractor.extract(sqUncollected)
                     emitGridLines(sqGrid, "sq", GridStyle.SQUADRAT, width, emitter, newPolylineIds)
                     if (sqEntered.isNotEmpty()) {
@@ -246,7 +250,8 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
                             shTiles.minOf { it.y }, shTiles.maxOf { it.y },
                         )
                         val shEntered = if (showEnteredTiles) recentlyEnteredSquadratinhos.intersect(shTileKeys) else emptySet<Long>()
-                        val shUncollected = shTileKeys - shCollected - shEntered
+                        // Cache-only, see sqUncollected above.
+                        val shUncollected = shTileKeys - shCollected
                         val shGrid = ContourExtractor.extract(shUncollected, ZoomLevel.SQUADRATINHO)
                         emitGridLines(shGrid, "sh", GridStyle.SQUADRATINHO, width, emitter, newPolylineIds)
                         if (shEntered.isNotEmpty()) {
