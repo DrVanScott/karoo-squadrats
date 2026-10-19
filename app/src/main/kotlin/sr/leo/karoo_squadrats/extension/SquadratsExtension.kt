@@ -237,18 +237,15 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
                             shTiles.minOf { it.x }, shTiles.maxOf { it.x },
                             shTiles.minOf { it.y }, shTiles.maxOf { it.y },
                         )
-                        // Only render if we have synced squadratinho data in this area
-                        if (shCollected.isNotEmpty()) {
-                            val shEntered = if (liveCollectionEnabled) recentlyEnteredSquadratinhos.intersect(shTileKeys) else emptySet<Long>()
-                            val shUncollected = shTileKeys - shCollected - shEntered
-                            val shGrid = ContourExtractor.extract(shUncollected, ZoomLevel.SQUADRATINHO)
-                            emitGridLines(shGrid, "sh", GridStyle.SQUADRATINHO, width, emitter, newPolylineIds)
-                            if (shEntered.isNotEmpty()) {
-                                val shEnteredGrid = insetTileContours(shEntered, ZoomLevel.SQUADRATINHO, zoom, ENTERED_INSET_PX)
-                                emitGridLines(shEnteredGrid, "she", GridStyle.ENTERED, width, emitter, newPolylineIds)
-                            }
-                            Log.d(TAG, "Squadratinhos: ${shTiles.size} render tiles, ${shUncollected.size} uncollected, ${shEntered.size} entered")
+                        val shEntered = if (liveCollectionEnabled) recentlyEnteredSquadratinhos.intersect(shTileKeys) else emptySet<Long>()
+                        val shUncollected = shTileKeys - shCollected - shEntered
+                        val shGrid = ContourExtractor.extract(shUncollected, ZoomLevel.SQUADRATINHO)
+                        emitGridLines(shGrid, "sh", GridStyle.SQUADRATINHO, width, emitter, newPolylineIds)
+                        if (shEntered.isNotEmpty()) {
+                            val shEnteredGrid = insetTileContours(shEntered, ZoomLevel.SQUADRATINHO, zoom, ENTERED_INSET_PX)
+                            emitGridLines(shEnteredGrid, "she", GridStyle.ENTERED, width, emitter, newPolylineIds)
                         }
+                        Log.d(TAG, "Squadratinhos: ${shTiles.size} render tiles, ${shUncollected.size} uncollected, ${shEntered.size} entered")
                     }
 
                     // Remove polylines that are no longer visible
