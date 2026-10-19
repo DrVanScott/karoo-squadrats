@@ -37,10 +37,13 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
     private var serviceJob: Job? = null
     private var rideStateJob: Job? = null
 
-    // Live collection requires an active ride recording (Recording/Paused) - without one
-    // there's no FIT file to serve as proof of the tiles actually being ridden.
+    // Live collection requires an actively recording ride - Paused is deliberately excluded,
+    // since Karoo doesn't write trackpoints to the FIT file while paused (confirmed by
+    // inspecting a real ride's FIT file: recording gaps lined up exactly with pause/resume),
+    // so tiles "entered" while paused (e.g. GPS drift while stopped in a store) would never be
+    // backed by anything the ride actually recorded.
     @Volatile
-    private var isRideActive = false
+    private var isRideRecording = false
 
     override fun onCreate() {
         super.onCreate()
@@ -66,14 +69,14 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
     }
 
     /**
-     * Tracks whether a ride is actively recording (see [isRideActive]) - live collection only
+     * Tracks whether a ride is actively recording (see [isRideRecording]) - live collection only
      * runs then, since there's no FIT file as proof otherwise.
      */
     private suspend fun observeRideCompletion() {
         karooSystem.consumerFlow<RideState>().collect { state ->
-            isRideActive = when (state) {
-                is RideState.Recording, is RideState.Paused -> true
-                is RideState.Idle -> false
+            isRideRecording = when (state) {
+                is RideState.Recording -> true
+                is RideState.Idle, is RideState.Paused -> false
             }
         }
     }
@@ -176,8 +179,8 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
                     // Track tile entry on every location update, independent of the redraw
                     // throttle below - otherwise a tile can be crossed between two redraws
                     // (e.g. during fast playback) without ever being recorded as entered.
-                    // Requires an active ride recording - see isRideActive.
-                    val liveCollectionEnabled = settings.getLiveCollectionEnabled() && isRideActive
+                    // Requires an actively recording ride - see isRideRecording.
+                    val liveCollectionEnabled = settings.getLiveCollectionEnabled() && isRideRecording
                     val enteredNewTile = if (liveCollectionEnabled && !isSeed) {
                         val result = trackEnteredTiles(lat, lon, lastTrackedLat, lastTrackedLon, settings.getSquadratinhosEnabled())
                         lastTrackedLat = lat
