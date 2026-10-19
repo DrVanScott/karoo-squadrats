@@ -180,8 +180,13 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
                     // throttle below - otherwise a tile can be crossed between two redraws
                     // (e.g. during fast playback) without ever being recorded as entered.
                     // Requires an actively recording ride - see isRideRecording.
-                    val liveCollectionEnabled = settings.getLiveCollectionEnabled() && isRideRecording
-                    val enteredNewTile = if (liveCollectionEnabled && !isSeed) {
+                    val trackingEnabled = settings.getLiveCollectionEnabled() && isRideRecording
+                    // Whether to render tiles already tracked as entered - distinct from
+                    // trackingEnabled, since entered tiles should keep their green styling past
+                    // ride-end (until a clear or sync confirms/refutes them), not disappear the
+                    // moment the ride stops actively recording.
+                    val showEnteredTiles = settings.getLiveCollectionEnabled()
+                    val enteredNewTile = if (trackingEnabled && !isSeed) {
                         val result = trackEnteredTiles(lat, lon, lastTrackedLat, lastTrackedLon, settings.getSquadratinhosEnabled())
                         lastTrackedLat = lat
                         lastTrackedLon = lon
@@ -221,7 +226,7 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
                         sqTiles.minOf { it.x }, sqTiles.maxOf { it.x },
                         sqTiles.minOf { it.y }, sqTiles.maxOf { it.y },
                     )
-                    val sqEntered = if (liveCollectionEnabled) recentlyEnteredSquadrats.intersect(sqTileKeys) else emptySet<Long>()
+                    val sqEntered = if (showEnteredTiles) recentlyEnteredSquadrats.intersect(sqTileKeys) else emptySet<Long>()
                     val sqUncollected = sqTileKeys - sqCollected - sqEntered
                     val sqGrid = ContourExtractor.extract(sqUncollected)
                     emitGridLines(sqGrid, "sq", GridStyle.SQUADRAT, width, emitter, newPolylineIds)
@@ -240,7 +245,7 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
                             shTiles.minOf { it.x }, shTiles.maxOf { it.x },
                             shTiles.minOf { it.y }, shTiles.maxOf { it.y },
                         )
-                        val shEntered = if (liveCollectionEnabled) recentlyEnteredSquadratinhos.intersect(shTileKeys) else emptySet<Long>()
+                        val shEntered = if (showEnteredTiles) recentlyEnteredSquadratinhos.intersect(shTileKeys) else emptySet<Long>()
                         val shUncollected = shTileKeys - shCollected - shEntered
                         val shGrid = ContourExtractor.extract(shUncollected, ZoomLevel.SQUADRATINHO)
                         emitGridLines(shGrid, "sh", GridStyle.SQUADRATINHO, width, emitter, newPolylineIds)
