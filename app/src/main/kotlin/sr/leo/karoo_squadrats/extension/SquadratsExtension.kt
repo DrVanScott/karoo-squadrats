@@ -39,11 +39,8 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
     private var serviceJob: Job? = null
     private var rideStateJob: Job? = null
 
-    // Live collection requires an actively recording ride - Paused is deliberately excluded,
-    // since Karoo doesn't write trackpoints to the FIT file while paused (confirmed by
-    // inspecting a real ride's FIT file: recording gaps lined up exactly with pause/resume),
-    // so tiles "entered" while paused (e.g. GPS drift while stopped in a store) would never be
-    // backed by anything the ride actually recorded.
+    // Live collection requires an actively recording ride - Paused is excluded, since Karoo
+    // doesn't write trackpoints to the FIT file while paused.
     @Volatile
     private var isRideRecording = false
 
@@ -131,10 +128,8 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
         var lastDrawLat = Double.NaN
         var lastDrawLon = Double.NaN
         var lastDrawZoom = Double.NaN
-        // Last position live-tracking actually ran for (distinct from lastDraw*, which is
-        // gated by the redraw throttle below) - reset to NaN whenever live-tracking is skipped
-        // for a tick, so a segment is never interpolated across a gap in live tracking itself
-        // (e.g. across two separate rides, or while the toggle/RideState gate was off).
+        // Last position live-tracking ran for (distinct from lastDraw*) - reset to NaN when
+        // tracking is skipped, so a segment is never interpolated across a tracking gap.
         var lastTrackedLat = Double.NaN
         var lastTrackedLon = Double.NaN
 
@@ -161,12 +156,8 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
             ) { location, mapZoom ->
                 Pair(location, mapZoom)
             }
-                // debounce(300) would never fire while updates arrive faster than every 300ms,
-                // starving redraws entirely - sample(300) instead redraws on a fixed cadence no
-                // matter how fast updates arrive. This matters for fast-forwarded ride replay:
-                // this feature was tested using the "Karoo Ride Replay" extension
-                // (https://github.com/lgaitano/karoo-ride-replay), which can mock GPS updates
-                // faster than real-time.
+                // debounce(300) would starve entirely under continuous fast updates -
+                // sample(300) redraws on a fixed cadence regardless of update rate.
                 .sample(300)
                 .collect { (location, mapZoom) ->
                     val lat = location.lat
@@ -176,24 +167,18 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
                     Log.d(TAG, "Map update: lat=$lat lon=$lon zoom=$zoom")
                     if (lat == 0.0 && lon == 0.0) return@collect
 
-                    // The very first location can be the synthetic seed above (rendered so
-                    // tiles show before a GPS fix) rather than a real position - never treat
-                    // that one as a live tile entry.
+                    // The first location can be the synthetic seed above, not a real position -
+                    // never treat it as a live tile entry.
                     val isSeed = isFirstLocation && (centerLat != 0.0 || centerLon != 0.0)
                     isFirstLocation = false
 
                     // Track tile entry on every sample(300) tick, independent of the
-                    // movement/zoom-based redraw skip below - otherwise a tile could be crossed
-                    // between two redraws without ever being recorded as entered. Gaps between
-                    // samples are covered by segment interpolation (see tilesToMark) as long as
-                    // consecutive samples stay chebyshev-adjacent, which holds at real-world GPS
-                    // update rates but can be exceeded under artificially sped-up ride replay.
-                    // Requires an actively recording ride - see isRideRecording.
+                    // movement/zoom redraw skip below - otherwise a tile could be crossed
+                    // between redraws without being recorded. Requires an actively recording
+                    // ride - see isRideRecording.
                     val trackingEnabled = settings.getLiveCollectionEnabled() && isRideRecording
-                    // Whether to render tiles already tracked as entered - distinct from
-                    // trackingEnabled, since entered tiles should keep their green styling past
-                    // ride-end (until a clear or sync confirms/refutes them), not disappear the
-                    // moment the ride stops actively recording.
+                    // Rendering gate, distinct from trackingEnabled - entered tiles keep their
+                    // green styling past ride-end until a clear or sync resolves them.
                     val showEnteredTiles = settings.getLiveCollectionEnabled()
                     val enteredNewTile = if (trackingEnabled && !isSeed) {
                         val result = trackEnteredTiles(lat, lon, lastTrackedLat, lastTrackedLon, settings.getSquadratinhosEnabled())
@@ -206,9 +191,8 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
                         false
                     }
 
-                    // Only redraw when zoom changed or GPS moved enough (~25% of visible area) -
-                    // unless a tile was just newly entered, which needs to flip to "entered"
-                    // styling immediately rather than waiting for the next qualifying redraw.
+                    // Only redraw on zoom/movement changes, unless a tile was just entered -
+                    // that needs to show immediately, not wait for the next qualifying redraw.
                     if (!enteredNewTile && !lastDrawZoom.isNaN() && zoom == lastDrawZoom) {
                         val cosLat = cos(Math.toRadians(lat)).coerceAtLeast(0.01)
                         val dLat = abs(lat - lastDrawLat)
@@ -236,10 +220,8 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
                         sqTiles.minOf { it.y }, sqTiles.maxOf { it.y },
                     )
                     val sqEntered = if (showEnteredTiles) recentlyEnteredSquadrats.intersect(sqTileKeys) else emptySet<Long>()
-                    // Cache-only, deliberately not excluding sqEntered: the solid/light boundary
-                    // distinction ContourExtractor draws should reflect confirmed cache state,
-                    // not a transient live-tracked tile - entered tiles stay part of the
-                    // surrounding uncollected grid underneath their green inset overlay.
+                    // Cache-only: excluding sqEntered here would let a live-tracked tile
+                    // manufacture a boundary the synced cache doesn't actually back.
                     val sqUncollected = sqTileKeys - sqCollected
                     val sqGrid = ContourExtractor.extract(sqUncollected)
                     emitGridLines(sqGrid, "sq", GridStyle.SQUADRAT, width, emitter, newPolylineIds)
@@ -260,8 +242,7 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
                         )
                         val shEntered = if (showEnteredTiles) recentlyEnteredSquadratinhos.intersect(shTileKeys) else emptySet<Long>()
                         // Only render if we have synced data or live-entered tiles here -
-                        // otherwise an area with no squadratinho data at all would show a full
-                        // "everything uncollected" grid instead of nothing.
+                        // otherwise an unsynced area would show a full orange grid.
                         if (shCollected.isNotEmpty() || shEntered.isNotEmpty()) {
                             // Cache-only, see sqUncollected above.
                             val shUncollected = shTileKeys - shCollected
@@ -299,9 +280,8 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
     companion object {
         private const val TAG = "SquadratMap"
 
-        // Tiles entered live during a ride, tracked only in memory (see trackEnteredTiles) -
-        // never written to the durable cache, since a ride may never actually be uploaded to or
-        // processed by Squadrats.
+        // Tiles entered live during a ride - in memory only, never written to the durable
+        // cache, since a ride may never actually be uploaded to or processed by Squadrats.
         private val recentlyEnteredSquadrats = Collections.newSetFromMap(ConcurrentHashMap<Long, Boolean>())
         private val recentlyEnteredSquadratinhos = Collections.newSetFromMap(ConcurrentHashMap<Long, Boolean>())
 
@@ -361,18 +341,10 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
         const val ENTERED_INSET_PX = 3.0
 
         /**
-         * Draws each entered tile as its own inset box rather than one contour around the
-         * merged entered region ([ContourExtractor.extract]'s usual behavior). Two adjacent
-         * entered tiles previously shared an invisible boundary (contour merges them into one
-         * blob) - and a shared edge with a still-uncollected neighbor rendered as a single line
-         * coincident with that neighbor's own boundary, making it hard to tell apart at a
-         * glance whether it's worth riding further that way. Shrinking each box toward its own
-         * tile center leaves a thin gap on every side, so a neighbor - entered or not - is
-         * always visually distinct, while the two lines still read as touching.
-         *
-         * [mapZoom] is needed (rather than a fixed fraction of tile size) because a tile's
-         * on-screen size varies hugely with zoom - converting a fixed pixel target into a
-         * lat/lon fraction here keeps the on-screen gap roughly constant at any zoom.
+         * Draws each entered tile as its own inset box (rather than one merged contour) so
+         * adjacent entered/uncollected tiles stay visually distinct. [mapZoom] converts the
+         * fixed pixel inset into a lat/lon fraction so the on-screen gap stays roughly
+         * constant at any zoom.
          */
         private fun insetTileContours(
             tileKeys: Set<Long>,
@@ -413,21 +385,13 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
         }
 
         /**
-         * Tiles to consider entered at the given zoom level for this location update: always the
-         * tile containing the current position, plus - when the previous tracked position's tile
-         * is chebyshev-adjacent (distance <= 1) to it - any tile the straight path between the
-         * two fixes passes through as well. This catches a tile only clipped at a corner between
-         * two GPS fixes (e.g. entering diagonally), probably matching squadrats.com's own
-         * classification. This has been evaluated by checking a lot of real live observations
-         * compared to squadrats.com interpretation.
+         * Tiles entered at this location update: the current tile, plus - when the previous
+         * tracked position is chebyshev-adjacent (distance <= 1) - any tile the straight segment
+         * between them crosses, to catch a tile only clipped at a corner. Beyond that distance
+         * the gap isn't trusted, since assuming a straight path across it produced false
+         * positives when cross-checked against squadrats.com.
          *
-         * Beyond chebyshev distance 1, the "in-between" tiles a straight line would cross are not
-         * trusted: they'd require assuming the real path ran perfectly straight across the entire
-         * real-world gap between two fixes (e.g. a GPS dropout or sparse recording on a straight
-         * stretch), which showed false additions when cross-checked against squadrats.com.
-         *
-         * [prevLat]/[prevLon] are NaN when there is no adjacent previous fix to interpolate from
-         * (first live-tracked location of a ride).
+         * [prevLat]/[prevLon] are NaN for the first tracked location of a ride.
          */
         fun tilesToMark(
             lat: Double,
