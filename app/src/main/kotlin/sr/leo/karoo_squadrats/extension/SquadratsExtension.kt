@@ -57,7 +57,7 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
             karooSystem.connect()
         }
         rideStateJob = CoroutineScope(Dispatchers.IO).launch {
-            observeRideCompletion()
+            observeRideState()
         }
     }
 
@@ -74,7 +74,7 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
      * Tracks whether a ride is actively recording (see [isRideRecording]) - live collection only
      * runs then, since there's no FIT file as proof otherwise.
      */
-    private suspend fun observeRideCompletion() {
+    private suspend fun observeRideState() {
         karooSystem.consumerFlow<RideState>().collect { state ->
             isRideRecording = when (state) {
                 is RideState.Recording -> true
