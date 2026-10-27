@@ -30,7 +30,9 @@ import kotlin.math.pow
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
-class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.VERSION_NAME) {
+// Karoo identifies extensions by this id (see res/xml/extension_info.xml), not by Android
+// package name.
+class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION_NAME) {
     private lateinit var karooSystem: KarooSystemService
     private lateinit var settings: Settings
     private lateinit var tileRepo: TileRepository
