@@ -176,9 +176,12 @@ class SquadratsExtension : KarooExtension(BuildConfig.EXTENSION_ID, BuildConfig.
                     val isSeed = isFirstLocation && (centerLat != 0.0 || centerLon != 0.0)
                     isFirstLocation = false
 
-                    // Track tile entry on every location update, independent of the redraw
-                    // throttle below - otherwise a tile can be crossed between two redraws
-                    // (e.g. during fast playback) without ever being recorded as entered.
+                    // Track tile entry on every sample(300) tick, independent of the
+                    // movement/zoom-based redraw skip below - otherwise a tile could be crossed
+                    // between two redraws without ever being recorded as entered. Gaps between
+                    // samples are covered by segment interpolation (see tilesToMark) as long as
+                    // consecutive samples stay chebyshev-adjacent, which holds at real-world GPS
+                    // update rates but can be exceeded under artificially sped-up ride replay.
                     // Requires an actively recording ride - see isRideRecording.
                     val trackingEnabled = settings.getLiveCollectionEnabled() && isRideRecording
                     // Whether to render tiles already tracked as entered - distinct from
