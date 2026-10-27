@@ -103,16 +103,20 @@ class SquadratsExtension : KarooExtension("karoo-squadrats", BuildConfig.VERSION
     ): Boolean {
         var changed = false
         for (sq in tilesToMark(lat, lon, prevLat, prevLon, ZoomLevel.SQUADRAT.z)) {
+            val key = sq.toKey()
+            if (key in recentlyEnteredSquadrats) continue
             if (tileRepo.collectedSquadratsInBounds(sq.x, sq.x, sq.y, sq.y).isEmpty()) {
-                if (recentlyEnteredSquadrats.add(sq.toKey())) {
+                if (recentlyEnteredSquadrats.add(key)) {
                     changed = true
                 }
             }
         }
         if (squadratinhosEnabled) {
             for (sh in tilesToMark(lat, lon, prevLat, prevLon, ZoomLevel.SQUADRATINHO.z)) {
+                val key = sh.toKey()
+                if (key in recentlyEnteredSquadratinhos) continue
                 if (tileRepo.collectedSquadratinhosInBounds(sh.x, sh.x, sh.y, sh.y).isEmpty()) {
-                    if (recentlyEnteredSquadratinhos.add(sh.toKey())) {
+                    if (recentlyEnteredSquadratinhos.add(key)) {
                         changed = true
                     }
                 }
